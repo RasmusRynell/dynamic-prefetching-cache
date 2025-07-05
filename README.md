@@ -1,4 +1,4 @@
-# Dynamic Prefetching Cache
+# Dynamic Prefetching Cache for Python
 
 A reusable framework that dynamically pre-loads and serves keyed data items with minimal latency. The system uses a user supplied predictive algorithm to anticipate future data access patterns and proactively cache the most likely needed items within configurable memory constraints.
 
