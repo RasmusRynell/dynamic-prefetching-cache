@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dynamic-prefetching-cache"
-version = "0.1.0"
+version = "0.1.1"
 description = "A predictive caching framework that dynamically pre-loads data items with minimal latency"
 readme = "README.md"
 license = {text = "MIT"}
