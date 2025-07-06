@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "dynamic-prefetching-cache"
 version = "0.1.0"
 description = "A predictive caching framework that dynamically pre-loads data items with minimal latency"
-readme = "readme.md"
+readme = "README.md"
 license = {text = "MIT"}
 authors = [
     {name = "Rasmus Rynell", email = "rynell.rasmus@gmail.com"}
@@ -77,6 +77,5 @@ addopts = [
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
 ] 
