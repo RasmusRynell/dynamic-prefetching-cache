@@ -11,6 +11,12 @@ Each line follows the MOT format:
 frame,track_id,bb_left,bb_top,bb_width,bb_height,confidence,x,y,z
 ```
 
+### Example
+
+```bash
+python scripts/generate_large_mot_data.py -o examples/data/large_data.txt -t 1000 -f 100000 
+```
+
 ### Using Generated Data
 
 Once generated, use the data files with the MOTDataProvider:

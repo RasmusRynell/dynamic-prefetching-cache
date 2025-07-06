@@ -17,7 +17,6 @@ The data provider is optimized for the following use cases:
 - Large datasets (e.g. < 100000 frames)
 """
 
-import json
 import sys
 import time
 from typing import List, Dict, Set, Any, Optional, Tuple

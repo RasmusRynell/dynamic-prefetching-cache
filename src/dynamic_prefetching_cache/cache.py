@@ -20,7 +20,7 @@ provider = MyDataProvider()  # Must implement DataProvider protocol
 predictor = MyAccessPredictor()  # Must implement AccessPredictor protocol
 
 # Create cache with context manager for clean resource management
-with DynamicPrefetchingCache(provider, predictor, max_keys=512) as cache:
+with DynamicPrefetchingCache(provider, predictor, max_keys_cached=512) as cache:
     # Just use get() - everything else is automatic
     for key in stream_of_keys:
         data = cache.get(key)  # Fast! Likely already prefetched
@@ -72,7 +72,7 @@ class MyAccessPredictor:
 
 - **Sequential access**: Use distance-based predictors (built-in)
 - **Random access**: Cache effectiveness drops, mostly becomes LRU
-- **Bursty access**: Tune `max_keys` and `max_number_of_keys_in_cache`
+- **Bursty access**: Tune `max_keys_cached` and `max_keys_prefetched`
 - **Slow provider**: Increase prefetch concurrency, monitor `prefetch_errors`
 
 ## Event Monitoring
@@ -99,7 +99,6 @@ import queue
 import logging
 import heapq
 
-# Set up proper logging
 logger = logging.getLogger('DynamicPrefetchingCache')
 
 from .types import (
@@ -145,7 +144,7 @@ class DynamicPrefetchingCache:
     
     ### Basic Usage
     ```python
-    with DynamicPrefetchingCache(provider, predictor, max_keys=512) as cache:
+    with DynamicPrefetchingCache(provider, predictor, max_keys_cached=512) as cache:
         for key in stream_of_keys:
             record = cache.get(key)
             process(record)
@@ -160,8 +159,8 @@ class DynamicPrefetchingCache:
     cache = DynamicPrefetchingCache(
         provider=my_provider,
         predictor=my_predictor,
-        max_keys=1000,
-        max_number_of_keys_in_cache=8,
+        max_keys_cached=1000,
+        max_keys_prefetched=8,
         on_event=handle_events
     )
     
@@ -194,10 +193,10 @@ class DynamicPrefetchingCache:
     def __init__(self,
                  provider: DataProvider,
                  predictor: AccessPredictor,
-                 max_keys: int = 100,
+                 max_keys_cached: int = 100,
                  eviction_policy: Type[EvictionPolicy] = EvictionPolicyOldest,
                  history_size: int = 30,
-                 max_number_of_keys_in_cache: int = 20,
+                 max_keys_prefetched: int = 20,
                  on_event: Optional[EventCallback] = None) -> None:
         """
         Initialize the Dynamic prefetched cache.
@@ -205,17 +204,17 @@ class DynamicPrefetchingCache:
         Args:
             provider: Data source that can load records by key
             predictor: Access pattern predictor that generates likelihood scores
-            max_keys: Maximum number of items to keep in cache
+            max_keys_cached: Maximum number of items to keep in cache
             eviction_policy: Policy class for choosing which items to evict when cache is full
             history_size: Maximum number of recent key accesses to remember for prediction
-            max_number_of_keys_in_cache: Maximum number of concurrent prefetch operations
+            max_keys_prefetched: Maximum number of concurrent prefetch operations
             on_event: Optional callback function for cache events
         """
         self.provider = provider
         self.predictor = predictor
-        self.max_keys = max_keys
+        self.max_keys_cached = max_keys_cached
         self.history_size = history_size
-        self.max_number_of_keys_in_cache = max_number_of_keys_in_cache
+        self.max_keys_prefetched = max_keys_prefetched
         self.on_event = on_event
         
         # Set up eviction policy
@@ -231,7 +230,7 @@ class DynamicPrefetchingCache:
         
         # Background worker thread
         self.shutdown_flag = threading.Event()
-        self.work_queue: queue.PriorityQueue = queue.PriorityQueue(maxsize=self.max_number_of_keys_in_cache*2)
+        self.work_queue: queue.PriorityQueue = queue.PriorityQueue(maxsize=self.max_keys_prefetched*2)
         self.queued_keys: Set[int] = set()
         self.queue_lock = Lock()
         self.worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
@@ -241,7 +240,7 @@ class DynamicPrefetchingCache:
         self._metrics_lock = Lock()
         self.metrics = CacheMetrics()
         
-        logger.info(f"DynamicPrefetchingCache initialized: max_keys={max_keys}, max_number_of_keys_in_cache={max_number_of_keys_in_cache}")
+        logger.info(f"DynamicPrefetchingCache initialized: max_keys_cached={max_keys_cached}, max_keys_prefetched={max_keys_prefetched}")
     
     def get(self, key: int) -> Any:
         """
@@ -323,18 +322,18 @@ class DynamicPrefetchingCache:
                 return desired_keys
             
             # Get only the top keys we actually need for prefetching
-            max_keys_to_fetch = min(
-                self.max_number_of_keys_in_cache,  # Max prefetch queue size
+            max_keys_cached_to_fetch = min(
+                self.max_keys_prefetched,  # Max prefetch queue size
                 len(uncached_scores)
             )
             
-            if max_keys_to_fetch <= 0:
+            if max_keys_cached_to_fetch <= 0:
                 return desired_keys
             
             # Use heapq.nlargest for efficient top-k selection
             # This is much faster than sorting all scores
             top_items = heapq.nlargest(
-                max_keys_to_fetch, 
+                max_keys_cached_to_fetch, 
                 uncached_scores.items(), 
                 key=lambda x: x[1]
             )
@@ -464,7 +463,7 @@ class DynamicPrefetchingCache:
     
     def _evict_if_needed(self) -> None:
         """Evict entries if over key limit. Must be called with cache_lock held."""
-        if not self.cache or len(self.cache) <= self.max_keys:
+        if not self.cache or len(self.cache) <= self.max_keys_cached:
             return
         
         # Calculate scores once for all evictions
@@ -473,14 +472,14 @@ class DynamicPrefetchingCache:
             scores = self.predictor.get_likelihoods(self.current_key, list(self.history))
         
         # Evict multiple items using the same scores
-        while self.cache and len(self.cache) > self.max_keys:
+        while self.cache and len(self.cache) > self.max_keys_cached:
             victim_key = self._pick_eviction_victim(scores)
             _ = self.cache.pop(victim_key)
             
             with self._metrics_lock:
                 self.metrics.evictions += 1
             
-            logger.debug(f"Evicted key {victim_key} (cache limit: {self.max_keys})")
+            logger.debug(f"Evicted key {victim_key} (cache limit: {self.max_keys_cached})")
             self._emit_event('cache_evict', key=victim_key)
     
     def _pick_eviction_victim(self, scores: Dict[int, float]) -> int:

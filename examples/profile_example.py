@@ -20,7 +20,7 @@ import io
 import argparse
 import tracemalloc
 from pathlib import Path
-from typing import Dict, List, Callable, Any, Generator, Optional, Tuple
+from typing import Dict, List, Generator, Optional, Tuple
 from contextlib import contextmanager
 
 # Add parent directory to Python path

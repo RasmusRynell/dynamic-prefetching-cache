@@ -7,8 +7,7 @@ used throughout the codebase to reduce file count and improve organization.
 
 import time
 from dataclasses import dataclass
-from typing import Any, Protocol, Sequence, Dict, List, Set, Mapping, Optional, Tuple
-from collections.abc import Mapping as AbstractMapping
+from typing import Any, Protocol, Sequence, Dict, List, Set, Mapping, Tuple
 
 
 # =============================================================================

@@ -32,7 +32,7 @@ class TestDynamicPrefetchingCache:
     
     @pytest.mark.unit
     def test_cache_eviction(self, mock_provider, mock_predictor):
-        """Test cache eviction when max_keys is exceeded."""
+        """Test cache eviction when max_keys_cached is exceeded."""
         # Test will be implemented
         pass
     

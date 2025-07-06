@@ -385,7 +385,7 @@ Cache Stats:
   Evictions: {self.stats.get('evictions', 0)}
   
 Cache Usage:
-  Keys: {self.stats.get('cache_keys', 0)}/{self.cache.max_keys}
+  Keys: {self.stats.get('cache_keys', 0)}/{self.cache.max_keys_cached}
   
 Prefetch:
   Active Tasks: {self.stats.get('active_prefetch_tasks', 0)}
