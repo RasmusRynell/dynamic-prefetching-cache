@@ -24,7 +24,7 @@ from .types import (
     MOTFrameData
 )
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 __author__ = "Rasmus Rynell"
 __email__ = "rynell.rasmus@gmail.com"
 
