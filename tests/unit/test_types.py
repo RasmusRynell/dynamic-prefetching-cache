@@ -121,7 +121,9 @@ class TestDataStructures:
             bb_top=200.0,
             bb_width=50.0,
             bb_height=75.0,
-            confidence=0.95
+            confidence=0.95,
+            class_id=125,
+            visibility_ratio=237
         )
         
         assert detection.frame == 1
@@ -131,17 +133,15 @@ class TestDataStructures:
         assert detection.bb_width == 50.0
         assert detection.bb_height == 75.0
         assert detection.confidence == 0.95
-        # Test default values
-        assert detection.x == 0.0
-        assert detection.y == 0.0
-        assert detection.z == 0.0
+        assert detection.class_id == 125
+        assert detection.visibility_ratio == 237
     
     @pytest.mark.unit
     def test_mot_frame_data_creation(self) -> None:
         """Test MOT frame data structure."""
         detections = [
-            MOTDetection(1, 42, 100.0, 200.0, 50.0, 75.0, 0.95),
-            MOTDetection(1, 43, 150.0, 250.0, 60.0, 80.0, 0.87)
+            MOTDetection(1, 42, 100.0, 200.0, 50.0, 75.0, 0.95, 125, 237),
+            MOTDetection(1, 43, 150.0, 250.0, 60.0, 80.0, 0.87, 130, 242)
         ]
         
         frame_data = MOTFrameData(frame_number=1, detections=detections)

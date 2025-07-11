@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import List, Dict
 
 from dynamic_prefetching_cache.providers import MOTDataProvider
-from dynamic_prefetching_cache.types import MOTDetection, MOTFrameData
 
 
 class TestMOTDataProvider:
@@ -24,16 +23,15 @@ class TestMOTDataProvider:
         
         # Check first detection
         detection = frame_data.detections[0]
-        assert detection.frame == 1
-        assert detection.track_id == 1
-        assert detection.bb_left == 100
-        assert detection.bb_top == 200
-        assert detection.bb_width == 50
-        assert detection.bb_height == 75
-        assert detection.confidence == 0.9
-        assert detection.x == 125
-        assert detection.y == 237
-        assert detection.z == 0
+        assert detection.frame == 1, f"Frame number should be 1, but is {detection.frame}"
+        assert detection.track_id == 1, f"Track ID should be 1, but is {detection.track_id}"
+        assert detection.bb_left == 100, f"BB left should be 100, but is {detection.bb_left}"
+        assert detection.bb_top == 200, f"BB top should be 200, but is {detection.bb_top}"
+        assert detection.bb_width == 50, f"BB width should be 50, but is {detection.bb_width}"
+        assert detection.bb_height == 75, f"BB height should be 75, but is {detection.bb_height}"
+        assert detection.confidence == 0.9, f"Confidence should be 0.9, but is {detection.confidence}"
+        assert detection.class_id == 125, f"Class ID should be 125, but is {detection.class_id}"
+        assert detection.visibility_ratio == 237, f"Visibility ratio should be 237, but is {detection.visibility_ratio}"
     
     def test_load_nonexistent_frame(self, temp_mot_file: str) -> None:
         """Test loading a non-existent frame returns empty data."""
@@ -184,9 +182,9 @@ class TestMOTDataProvider:
     def test_index_building_with_duplicate_frames(self) -> None:
         """Test index building when same frame appears multiple times."""
         data_lines = [
-            "1,1,100,200,50,75,0.9,125,237,0",
-            "1,2,200,300,60,80,0.8,230,340,0",
-            "1,3,300,400,70,90,0.7,335,445,0",  # Same frame, different detection
+            "1,1,100,200,50,75,0.9,125,237",
+            "1,2,200,300,60,80,0.8,230,340",
+            "1,3,300,400,70,90,0.7,335,445",  # Same frame, different detection
         ]
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
@@ -216,9 +214,9 @@ class TestMOTDataProvider:
         """Test that file seeking reads correct data from correct positions."""
         # Create a file with known byte positions
         data_lines = [
-            "1,1,100,200,50,75,0.9,125,237,0",  # Frame 1
-            "5,1,500,600,50,75,0.9,525,637,0",  # Frame 5 (skip frames 2-4)
-            "10,1,1000,1100,50,75,0.9,1025,1137,0",  # Frame 10
+            "1,1,100,200,50,75,0.9,125,237",  # Frame 1
+            "5,1,500,600,50,75,0.9,525,637",  # Frame 5 (skip frames 2-4)
+            "10,1,1000,1100,50,75,0.9,1025,1137",  # Frame 10
         ]
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:

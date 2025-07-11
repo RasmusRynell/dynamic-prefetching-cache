@@ -8,7 +8,7 @@ Optimized implementation with:
 - Efficient file seeking instead of sequential reads
 
 The mot file format is:
-"<frame>,<id>,<bb_left>,<bb_top>,<bb_width>,<bb_height>,<confidence>,<x>,<y>,<z>"
+"<frame>,<id>,<bb_left>,<bb_top>,<bb_width>,<bb_height>,<confidence>,<class_id>,<visibility_ratio>"
 
 The data provider is optimized for the following use cases:
 - Sequential access patterns (e.g. video playback)
@@ -83,9 +83,9 @@ class MOTDataProvider(DataProvider):
     def _parse_detection_line_fast(self, line: str) -> MOTDetection:
         """Optimized parsing with reduced overhead."""
         parts = line.split(',')
-        if len(parts) < 7:
+        if len(parts) != 9:
             raise ValueError("Invalid line format")
-        
+
         # Direct conversion without intermediate variables
         return MOTDetection(
             frame=int(parts[0]),
@@ -95,9 +95,8 @@ class MOTDataProvider(DataProvider):
             bb_width=float(parts[4]),
             bb_height=float(parts[5]),
             confidence=float(parts[6]),
-            x=float(parts[7]) if len(parts) > 7 else 0.0,
-            y=float(parts[8]) if len(parts) > 8 else 0.0,
-            z=float(parts[9]) if len(parts) > 9 else 0.0
+            class_id=int(parts[7]),
+            visibility_ratio=float(parts[8])
         )
     
     def _load_frame_data_direct(self, frame_number: int) -> MOTFrameData:

@@ -156,9 +156,8 @@ class MOTDetection:
     bb_width: float
     bb_height: float
     confidence: float
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
+    class_id: int
+    visibility_ratio: float
 
 
 @dataclass
