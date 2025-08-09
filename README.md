@@ -110,12 +110,12 @@ High-performance provider for MOT (Multiple Object Tracking) data files:
 ```python
 from dynamic_prefetching_cache.providers import MOTDataProvider
 
-# Optimized for MOT format files with built-in indexing and caching
-provider = MOTDataProvider('data/tracking_results.txt', cache_size=100)
+# Optimized for MOT format files with built-in indexing and direct seeking
+provider = MOTDataProvider('data/tracking_results.txt')
 
 # Includes comprehensive statistics
 stats = provider.get_stats()
-print(f"Provider cache hit rate: {stats['cache_hit_rate']:.2%}")
+print(f"Indexed frames: {stats['total_frames']}, avg direct load: {stats['avg_direct_load_time']:.6f}s")
 ```
 
 ## Configuration

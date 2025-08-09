@@ -14,7 +14,7 @@ class TestMOTDataProvider:
     
     def test_load_valid_frame(self, temp_mot_file: str) -> None:
         """Test loading a valid frame returns correct data."""
-        provider = MOTDataProvider(temp_mot_file, cache_size=10)
+        provider = MOTDataProvider(temp_mot_file)
         
         frame_data = provider.load(1)
         
@@ -35,7 +35,7 @@ class TestMOTDataProvider:
     
     def test_load_nonexistent_frame(self, temp_mot_file: str) -> None:
         """Test loading a non-existent frame returns empty data."""
-        provider = MOTDataProvider(temp_mot_file, cache_size=10)
+        provider = MOTDataProvider(temp_mot_file)
         
         frame_data = provider.load(999)
         
@@ -44,7 +44,7 @@ class TestMOTDataProvider:
     
     def test_load_batch_mixed_frames(self, temp_mot_file: str) -> None:
         """Test batch loading with mix of existing and non-existing frames."""
-        provider = MOTDataProvider(temp_mot_file, cache_size=10)
+        provider = MOTDataProvider(temp_mot_file)
         
         batch_data = provider.load_batch([1, 2, 999, 3])
         
@@ -80,7 +80,7 @@ class TestMOTDataProvider:
             temp_path = f.name
         
         try:
-            provider = MOTDataProvider(temp_path, cache_size=10)
+            provider = MOTDataProvider(temp_path)
             
             assert provider.get_total_frames() == 0
             assert len(provider.get_available_frames()) == 0
@@ -108,7 +108,7 @@ class TestMOTDataProvider:
             temp_path = f.name
         
         try:
-            provider = MOTDataProvider(temp_path, cache_size=10)
+            provider = MOTDataProvider(temp_path)
             
             # Should handle gracefully - no frames indexed
             assert provider.get_total_frames() == 0
@@ -130,7 +130,7 @@ class TestMOTDataProvider:
             temp_path = f.name
         
         try:
-            provider = MOTDataProvider(temp_path, cache_size=10)
+            provider = MOTDataProvider(temp_path)
             
             # Frames should be indexed (valid frame numbers)
             assert provider.get_total_frames() == 2
@@ -149,35 +149,7 @@ class TestMOTDataProvider:
         finally:
             os.unlink(temp_path)
     
-    def test_cache_lru_behavior(self, temp_mot_file: str) -> None:
-        """Test LRU cache eviction behavior."""
-        provider = MOTDataProvider(temp_mot_file, cache_size=2)
-        
-        # Load frames to fill cache
-        provider.load(1)
-        provider.load(2)
-        
-        stats = provider.get_stats()
-        assert stats['cache_size'] == 2
-        assert stats['cache_misses'] == 2
-        assert stats['cache_hits'] == 0
-        
-        # Access frame 1 again (should be cache hit)
-        provider.load(1)
-        stats = provider.get_stats()
-        assert stats['cache_hits'] == 1
-        
-        # Load frame 3 (should evict frame 2, the least recently used)
-        provider.load(3)
-        stats = provider.get_stats()
-        assert stats['cache_size'] == 2
-        assert stats['cache_misses'] == 3
-        
-        # Access frame 2 again (should be cache miss since it was evicted)
-        provider.load(2)
-        stats = provider.get_stats()
-        assert stats['cache_hits'] == 1
-        assert stats['cache_misses'] == 4
+    # Removed: internal LRU cache is no longer part of provider
     
     def test_index_building_with_duplicate_frames(self) -> None:
         """Test index building when same frame appears multiple times."""
@@ -193,7 +165,7 @@ class TestMOTDataProvider:
             temp_path = f.name
         
         try:
-            provider = MOTDataProvider(temp_path, cache_size=10)
+            provider = MOTDataProvider(temp_path)
             
             assert provider.get_total_frames() == 1  # Only one unique frame
             assert 1 in provider.get_available_frames()
@@ -225,7 +197,7 @@ class TestMOTDataProvider:
             temp_path = f.name
         
         try:
-            provider = MOTDataProvider(temp_path, cache_size=10)
+            provider = MOTDataProvider(temp_path)
             
             # Test loading frame 5 specifically
             frame_data = provider.load(5)
@@ -245,53 +217,31 @@ class TestMOTDataProvider:
             os.unlink(temp_path)
     
     def test_statistics_collection(self, temp_mot_file: str) -> None:
-        """Test that statistics are collected correctly."""
-        provider = MOTDataProvider(temp_mot_file, cache_size=2)
-        
+        """Test that statistics about indexing and I/O are collected."""
+        provider = MOTDataProvider(temp_mot_file)
+
         # Initial stats
         stats = provider.get_stats()
-        assert stats['cache_hits'] == 0
-        assert stats['cache_misses'] == 0
-        assert stats['cache_hit_rate'] == 0.0
-        
-        # Load some frames
-        provider.load(1)
-        provider.load(2)
-        provider.load(1)  # Cache hit
-        
-        stats = provider.get_stats()
-        assert stats['cache_hits'] == 1
-        assert stats['cache_misses'] == 2
-        assert stats['cache_hit_rate'] == 1/3
         assert stats['total_frames'] == 3
-        assert 'avg_cache_hit_time' in stats
-        assert 'avg_cache_miss_time' in stats
-    
-    def test_clear_cache_functionality(self, temp_mot_file: str) -> None:
-        """Test cache clearing functionality."""
-        provider = MOTDataProvider(temp_mot_file, cache_size=10)
-        
-        # Load frames to populate cache
+        assert 'total_indexed_lines' in stats
+        assert 'index_memory_bytes' in stats
+        assert 'avg_direct_load_time' in stats
+        assert 'index_build_time' in stats
+
+        # Load some frames (ensure timing fields get updated)
         provider.load(1)
         provider.load(2)
-        
-        stats = provider.get_stats()
-        assert stats['cache_size'] == 2
-        
-        # Clear cache
-        provider.clear_cache()
-        
-        stats = provider.get_stats()
-        assert stats['cache_size'] == 0
-        
-        # Next load should be cache miss
         provider.load(1)
+
         stats = provider.get_stats()
-        assert stats['cache_misses'] == 3  # 2 initial + 1 after clear
+        assert stats['total_frames'] == 3
+        assert 'avg_direct_load_time' in stats
+    
+    # Removed: clear_cache no longer exists in provider
     
     def test_resource_cleanup(self, temp_mot_file: str) -> None:
         """Test that resources are properly cleaned up."""
-        provider = MOTDataProvider(temp_mot_file, cache_size=10)
+        provider = MOTDataProvider(temp_mot_file)
         
         # Load some data to open file handle
         provider.load(1)
@@ -304,28 +254,16 @@ class TestMOTDataProvider:
         provider.close()
         
         assert provider._file_handle.closed
-        assert len(provider.frame_cache) == 0
     
-    def test_batch_loading_cache_interaction(self, temp_mot_file: str) -> None:
-        """Test that batch loading properly interacts with cache."""
-        provider = MOTDataProvider(temp_mot_file, cache_size=10)
-        
-        # Pre-load frame 1 into cache
-        provider.load(1)
-        
-        # Verify frame 1 is in cache
-        stats = provider.get_stats()
-        assert stats['cache_size'] == 1
-        assert stats['cache_misses'] == 1
-        
-        # Batch load including cached frame
+    def test_batch_loading_returns_all_requested_frames(self, temp_mot_file: str) -> None:
+        """Test batch loading returns a mapping for requested frames and updates timing stats."""
+        provider = MOTDataProvider(temp_mot_file)
+
         batch_data = provider.load_batch([1, 2, 3])
-        
-        # All frames should be in result
+
         assert len(batch_data) == 3
         assert all(frame_num in batch_data for frame_num in [1, 2, 3])
-        
-        # Cache should now contain all 3 frames
+
         stats = provider.get_stats()
-        assert stats['cache_size'] == 3
+        assert 'avg_batch_total_time' in stats
     

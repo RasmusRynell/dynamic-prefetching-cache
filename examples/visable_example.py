@@ -42,7 +42,7 @@ class CacheVisualizerApp:
         self.root.geometry("1200x600")
         
         # Cache setup with optimized settings
-        self.provider = MOTDataProvider('examples/data/ultra_dense_data.txt', cache_size=100)
+        self.provider = MOTDataProvider('examples/data/ultra_dense_data.txt')
         self.predictor = DynamicDataPredictor(possible_jumps=NAVIGATION_STEPS)
         self.cache = DynamicPrefetchingCache(
             provider=self.provider,

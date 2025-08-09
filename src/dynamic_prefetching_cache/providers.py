@@ -1,47 +1,36 @@
 """
 MOT DataProvider - High-Performance Implementation
 
-Optimized implementation with:
-- File position indexing (byte offsets for O(1) access)
-- LRU caching for frequently accessed frames
-- Batch loading capabilities
+Optimized for:
+- File position indexing (byte offsets for O(1)-like direct access)
 - Efficient file seeking instead of sequential reads
+- Batch loading convenience
 
-The mot file format is:
+
+MOT line format:
 "<frame>,<id>,<bb_left>,<bb_top>,<bb_width>,<bb_height>,<confidence>,<class_id>,<visibility_ratio>"
-
-The data provider is optimized for the following use cases:
-- Sequential access patterns (e.g. video playback)
-- Jump access patterns (e.g. seeking to a specific frame)
-- Mixed access patterns (e.g. random access)
-- Large datasets (e.g. < 100000 frames)
 """
 
 import sys
 import time
 from typing import List, Dict, Set, Any, Optional, Tuple
-from collections import OrderedDict
 
 from .types import DataProvider, MOTDetection, MOTFrameData
 
 
 class MOTDataProvider(DataProvider):
-    """High-performance MOT (multiple object tracking) DataProvider with optimizations."""
-    
-    def __init__(self, data_file: str, cache_size: int = 100):
+    """High-performance MOT (multiple object tracking) DataProvider with byte-offset indexing."""
+
+    def __init__(self, data_file: str):
         self.data_file = data_file
-        self.cache_size = cache_size
         self.statistics: Dict[str, float] = {}
-        
+
         # Optimized index: frame_number -> list of (byte_offset, line_length)
         self.frame_index: Dict[int, List[Tuple[int, int]]] = {}
-        
-        # LRU cache for recently loaded frames
-        self.frame_cache: OrderedDict[int, MOTFrameData] = OrderedDict()
-        
+
         # Keep file handle open for efficient seeking
         self._file_handle: Optional[Any] = None
-        
+
         self._build_optimized_index()
 
     def _build_optimized_index(self) -> None:
@@ -128,19 +117,6 @@ class MOTDataProvider(DataProvider):
         
         return MOTFrameData(frame_number=frame_number, detections=detections)
     
-    def _update_cache(self, frame_number: int, frame_data: MOTFrameData) -> None:
-        """Update LRU cache with new frame data."""
-        # Remove if already exists (to update position)
-        if frame_number in self.frame_cache:
-            del self.frame_cache[frame_number]
-        
-        # Add to end (most recently used)
-        self.frame_cache[frame_number] = frame_data
-        
-        # Evict oldest if cache is full
-        while len(self.frame_cache) > self.cache_size:
-            self.frame_cache.popitem(last=False)  # Remove oldest
-    
     def _update_statistics(self, key: str, value: float) -> None:
         """Update running statistics."""
         count_key = f"{key}_count"
@@ -156,54 +132,21 @@ class MOTDataProvider(DataProvider):
         self.statistics[avg_key] = new_avg
     
     def load(self, frame_number: int) -> MOTFrameData:
-        """Load a single frame with caching."""
-        start_time = time.time()
-        
-        # Check cache first
-        if frame_number in self.frame_cache:
-            # Move to end (mark as recently used)
-            frame_data = self.frame_cache.pop(frame_number)
-            self.frame_cache[frame_number] = frame_data
-            
-            self._update_statistics('cache_hit_time', time.time() - start_time)
-            self.statistics['cache_hits'] = self.statistics.get('cache_hits', 0) + 1
-            return frame_data
-        
-        # Cache miss - load from file
-        frame_data = self._load_frame_data_direct(frame_number)
-        self._update_cache(frame_number, frame_data)
-        
-        self._update_statistics('cache_miss_time', time.time() - start_time)
-        self.statistics['cache_misses'] = self.statistics.get('cache_misses', 0) + 1
-        
-        return frame_data
+        """Load a single frame by seeking directly to indexed byte positions."""
+        return self._load_frame_data_direct(frame_number)
     
     def load_batch(self, frame_numbers: List[int]) -> Dict[int, MOTFrameData]:
-        """Load multiple frames efficiently with batch optimization."""
+        """Load multiple frames and return a mapping from frame number to data."""
         start_time = time.time()
-        
-        # Separate cached vs uncached frames
-        cached_frames = {}
-        uncached_frames = []
-        
+
+        result: Dict[int, MOTFrameData] = {}
         for frame_num in frame_numbers:
-            if frame_num in self.frame_cache:
-                cached_frames[frame_num] = self.frame_cache[frame_num]
-                # Update cache position
-                self.frame_cache.move_to_end(frame_num)
-            else:
-                uncached_frames.append(frame_num)
-        
-        # Load uncached frames individually (simplified batch loading)
-        for frame_num in uncached_frames:
-            frame_data = self._load_frame_data_direct(frame_num)
-            self._update_cache(frame_num, frame_data)
-            cached_frames[frame_num] = frame_data
-        
+            result[frame_num] = self._load_frame_data_direct(frame_num)
+
         total_time = time.time() - start_time
         self._update_statistics('batch_total_time', total_time)
-        
-        return cached_frames
+
+        return result
     
     def get_total_frames(self) -> int:
         """Get total number of frames."""
@@ -214,37 +157,24 @@ class MOTDataProvider(DataProvider):
         return set(self.frame_index.keys())
     
     def get_stats(self) -> Dict[str, Any]:
-        """Get comprehensive statistics."""
+        """Get provider statistics (indexing and I/O timings)."""
         total_lines = sum(len(positions) for positions in self.frame_index.values())
-        cache_hits = self.statistics.get('cache_hits', 0)
-        cache_misses = self.statistics.get('cache_misses', 0)
-        total_requests = cache_hits + cache_misses
-        
+
         stats = {
             'total_frames': len(self.frame_index),
             'total_indexed_lines': total_lines,
             'index_memory_bytes': sys.getsizeof(self.frame_index),
-            'cache_size': len(self.frame_cache),
-            'cache_max_size': self.cache_size,
-            'cache_hits': cache_hits,
-            'cache_misses': cache_misses,
-            'cache_hit_rate': cache_hits / total_requests if total_requests > 0 else 0.0,
             'avg_direct_load_time': self.statistics.get('avg_direct_load_time', 0.0),
-            'avg_cache_hit_time': self.statistics.get('avg_cache_hit_time', 0.0),
-            'avg_cache_miss_time': self.statistics.get('avg_cache_miss_time', 0.0),
+            'avg_batch_total_time': self.statistics.get('avg_batch_total_time', 0.0),
+            'index_build_time': self.statistics.get('index_build_time', 0.0),
         }
-        
+
         return stats
-    
-    def clear_cache(self) -> None:
-        """Clear the frame cache."""
-        self.frame_cache.clear()
     
     def close(self) -> None:
         """Close file handle and clean up resources."""
         if self._file_handle and not self._file_handle.closed:
             self._file_handle.close()
-        self.frame_cache.clear()
     
     def __del__(self) -> None:
         """Cleanup on destruction."""
