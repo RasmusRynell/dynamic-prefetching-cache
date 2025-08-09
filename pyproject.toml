@@ -37,6 +37,9 @@ dev = [
     "pytest-cov>=4.0",
     "pytest-asyncio>=0.21",
 ]
+examples = [
+    "tabulate>=0.9",
+]
 
 [project.urls]
 Repository = "https://github.com/rasmusrynell/dynamic-prefetching-cache"

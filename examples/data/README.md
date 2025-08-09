@@ -29,12 +29,3 @@ provider = MOTDataProvider('examples/data/test_data.txt')
 print(f"Generated data has {provider.get_total_frames()} frames")
 print(f"Available frame range: {min(provider.get_available_frames())}-{max(provider.get_available_frames())}")
 ```
-
-### Data Size Guidelines
-
-| Configuration | Approx. Size | Use Case |
-|---------------|-------------|----------|
-| 100 tracks, 1K frames | ~1MB | Quick testing, development |
-| 500 tracks, 10K frames | ~50MB | Performance testing |
-| 1000 tracks, 100K frames | ~500MB | Stress testing, large datasets |
-| 2000 tracks, 200K frames | ~2GB | Maximum performance testing |
