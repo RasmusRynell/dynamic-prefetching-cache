@@ -125,7 +125,7 @@ cache = DynamicPrefetchingCache(
     provider=my_provider,
     predictor=my_predictor,
     max_keys_cached=1000,                   # Maximum items in cache
-    max_keys_prefetched=8,                  # Max concurrent prefetch tasks
+    max_keys_prefetched=8,                  # Max queued prefetch keys (queue size)
     history_size=30,                        # Access history for prediction
     eviction_policy=EvictionPolicyOldest,   # Cache eviction strategy
     on_event=my_event_handler               # Optional event monitoring
@@ -155,7 +155,7 @@ stats = cache.stats()
 print(f"Cache hits: {stats['hits']}")
 print(f"Cache misses: {stats['misses']}")
 print(f"Hit rate: {stats['hits'] / (stats['hits'] + stats['misses']):.2%}")
-print(f"Active prefetch tasks: {stats['active_prefetch_tasks']}")
+print(f"Queued prefetch keys: {stats['active_prefetch_tasks']}")
 ```
 
 ## Thread Safety

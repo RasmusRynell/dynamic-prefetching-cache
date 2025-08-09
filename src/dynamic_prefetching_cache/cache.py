@@ -125,7 +125,7 @@ class DynamicPrefetchingCache:
     The main method you need is `get(key)` - it handles everything automatically:
     - Updates current position tracking
     - Triggers intelligent prefetching in the background
-    - Returns data from cache or loads it synchronously
+    - Returns the data (from cache or loads it synchronously)
     
     ## Lifecycle & Telemetry
     
@@ -207,7 +207,7 @@ class DynamicPrefetchingCache:
             max_keys_cached: Maximum number of items to keep in cache
             eviction_policy: Policy class for choosing which items to evict when cache is full
             history_size: Maximum number of recent key accesses to remember for prediction
-            max_keys_prefetched: Maximum number of concurrent prefetch operations
+            max_keys_prefetched: Maximum number of queued prefetch keys (queue size)
             on_event: Optional callback function for cache events
         """
         self.provider = provider
@@ -312,7 +312,10 @@ class DynamicPrefetchingCache:
         self._sync_work_queue(desired_keys_with_scores, is_rebuild)
     
     def _get_desired_keys_with_scores(self, scores: Dict[int, float]) -> List[Tuple[int, float]]:
-        """Get the keys we want to prefetch with their scores, sorted by priority."""
+        """Get the keys we want to prefetch with their scores, sorted by priority.
+
+        Filters out keys already cached.
+        """
         desired_keys: List[Tuple[int, float]] = []
         with self.cache_lock:
             # Filter out already cached keys first
@@ -512,16 +515,18 @@ class DynamicPrefetchingCache:
             - misses: Number of cache misses (data loaded from provider)
             - evictions: Number of items evicted due to key limits
             - prefetch_errors: Number of prefetch operations that failed
-            - cache_keys: Current number of items in cache
-            - active_prefetch_tasks: Number of currently running prefetch tasks        
+             - cache_keys: Current number of items in cache
+             - active_prefetch_tasks: Number of queued prefetch keys (queue size)        
         """
         with self._metrics_lock:
+            with self.cache_lock:
+                cache_len = len(self.cache)
             return {
                 'hits': self.metrics.hits,
                 'misses': self.metrics.misses,
                 'evictions': self.metrics.evictions,
                 'prefetch_errors': self.metrics.prefetch_errors,
-                'cache_keys': len(self.cache),
+                'cache_keys': cache_len,
                 'active_prefetch_tasks': self.work_queue.qsize()
             }
     

@@ -388,7 +388,7 @@ Cache Usage:
   Keys: {self.stats.get('cache_keys', 0)}/{self.cache.max_keys_cached}
   
 Prefetch:
-  Active Tasks: {self.stats.get('active_prefetch_tasks', 0)}
+  Queued Prefetch Keys: {self.stats.get('active_prefetch_tasks', 0)}
   Errors: {self.stats.get('prefetch_errors', 0)}"""
         
         hit_rate: float = 0.0

@@ -14,6 +14,7 @@ MOT line format:
 import sys
 import time
 from typing import List, Dict, Set, Any, Optional, Tuple
+from threading import Lock
 
 from .types import DataProvider, MOTDetection, MOTFrameData
 
@@ -31,42 +32,48 @@ class MOTDataProvider(DataProvider):
         # Keep file handle open for efficient seeking
         self._file_handle: Optional[Any] = None
 
+        # Serialize file seek/read for thread safety
+        self._io_lock: Lock = Lock()
+
         self._build_optimized_index()
 
     def _build_optimized_index(self) -> None:
-        """Build optimized index with byte offsets for O(1) file access."""
+        """Build optimized index with byte offsets for O(1) file access (binary-safe)."""
         start_time = time.time()
-        
-        with open(self.data_file, 'r') as f:
+
+        with open(self.data_file, 'rb') as f:
             byte_offset = 0
-            
-            for line in f:
-                line_length = len(line.encode('utf-8'))
-                line_content = line.strip()
-                
-                if line_content:
+
+            for line_bytes in f:
+                # Raw line length in bytes (including newline if present)
+                raw_len = len(line_bytes)
+                # Strip newline/whitespace to get content length (bytes)
+                content_bytes = line_bytes.strip()
+
+                if content_bytes:
                     try:
-                        # Parse only the frame number (first field)
-                        frame = int(line_content.split(',')[0])
-                        
+                        # Parse only the frame number (first field) from bytes
+                        frame = int(content_bytes.split(b',')[0])
+
                         if frame not in self.frame_index:
                             self.frame_index[frame] = []
-                        
-                        # Store byte offset and length for direct seeking
-                        self.frame_index[frame].append((byte_offset, len(line_content)))
-                        
+
+                        # Store byte offset and CONTENT length for direct seeking
+                        # We will read exactly this many bytes starting at byte_offset
+                        self.frame_index[frame].append((byte_offset, len(content_bytes)))
+
                     except (ValueError, IndexError):
                         pass  # Skip invalid lines
-                
-                byte_offset += line_length
-        
+
+                byte_offset += raw_len
+
         self.statistics['index_build_time'] = time.time() - start_time
         self.statistics['total_frames_indexed'] = len(self.frame_index)
     
     def _get_file_handle(self) -> Any:
-        """Get or create file handle for efficient seeking."""
+        """Get or create file handle for efficient seeking (binary mode)."""
         if self._file_handle is None or self._file_handle.closed:
-            self._file_handle = open(self.data_file, 'r')
+            self._file_handle = open(self.data_file, 'rb')
         return self._file_handle
     
     def _parse_detection_line_fast(self, line: str) -> MOTDetection:
@@ -102,8 +109,16 @@ class MOTDataProvider(DataProvider):
         detections = []
         
         for byte_offset, line_length in positions:
-            file_handle.seek(byte_offset)
-            line = file_handle.read(line_length).strip()
+            # Serialize seek/read to avoid interleaving between threads
+            with self._io_lock:
+                file_handle.seek(byte_offset)
+                line_bytes = file_handle.read(line_length)
+            # Decode after releasing lock to minimize lock time
+            try:
+                line = line_bytes.decode('utf-8').strip()
+            except UnicodeDecodeError:
+                # Skip lines that cannot be decoded as UTF-8
+                continue
             
             if line:
                 try:
@@ -173,9 +188,14 @@ class MOTDataProvider(DataProvider):
     
     def close(self) -> None:
         """Close file handle and clean up resources."""
-        if self._file_handle and not self._file_handle.closed:
-            self._file_handle.close()
+        fh = getattr(self, "_file_handle", None)
+        if fh and not fh.closed:
+            fh.close()
     
     def __del__(self) -> None:
         """Cleanup on destruction."""
-        self.close()
+        try:
+            self.close()
+        except Exception:
+            # Avoid raising during interpreter shutdown or partial initialization
+            pass

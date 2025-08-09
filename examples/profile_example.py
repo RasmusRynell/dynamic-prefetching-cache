@@ -21,6 +21,7 @@ import argparse
 import tracemalloc
 from pathlib import Path
 from typing import Dict, List, Generator, Optional, Tuple
+import subprocess
 from contextlib import contextmanager
 
 # Add parent directory to Python path
@@ -40,6 +41,8 @@ class ApplicationProfiler:
         
     def setup_system(self) -> tuple:
         """Set up the complete cache system."""
+        if not Path(self.data_file).exists():
+            subprocess.run([sys.executable, str(parent_dir / 'scripts' / 'generate_large_mot_data.py'), '--output', self.data_file, '--tracks', '200', '--frames', '5000', '--seed', '42'], check=True)
         provider = MOTDataProvider(self.data_file)
         predictor = DynamicDataPredictor(possible_jumps=NAVIGATION_STEPS)
         cache = DynamicPrefetchingCache(provider, predictor)
@@ -83,9 +86,10 @@ class ApplicationProfiler:
         print(f"🔍 Profiling {pattern_name} access pattern...")
         
         with self.timer(f'{pattern_name}_access'):
+            available_set = set(available_frames)
             for i in range(min(num_operations, len(available_frames) * 2)):
                 frame = pattern_func(i)
-                if frame < len(available_frames):
+                if frame in available_set:
                     cache.get(frame)
         
         # Report results
